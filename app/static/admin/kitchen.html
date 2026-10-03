@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin · Kitchen</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <main>
+    <nav class="nav"><a href="./">Tracked items</a> · <strong>Kitchen</strong></nav>
+    <h1>Kitchen</h1>
+    <p class="sub">Ingredients, weekly specials and on-hand inventory. Edits save when you leave a field.</p>
+    <p id="status" role="status"></p>
+
+    <h2>Ingredients</h2>
+    <p class="hint">On hand counts unexpired batches. Low when below the reorder level.</p>
+    <table class="edit">
+      <thead><tr><th>Name</th><th>Role</th><th>Package</th><th>Regular $</th><th>Perishable</th><th>Stock unit</th><th>Reorder at</th><th>On hand</th><th></th></tr></thead>
+      <tbody id="ingredients"></tbody>
+    </table>
+    <form id="ing-form" class="row" autocomplete="off">
+      <input name="name" placeholder="New ingredient, e.g. sprinkles" required>
+      <select name="role"><option value="addin">addin</option><option value="base">base</option></select>
+      <input name="unit_text" placeholder="Package, e.g. 300 g" required>
+      <input name="baseline" type="number" min="0.01" step="0.01" placeholder="Regular $" required>
+      <input name="stock_unit" placeholder="Stock unit" value="units">
+      <input name="reorder_at" type="number" min="0" step="any" placeholder="Reorder at" value="0">
+      <label class="check"><input name="perishable" type="checkbox"> Perishable</label>
+      <button type="submit">Add</button>
+    </form>
+
+    <h2>Specials</h2>
+    <p class="hint">Each special is the original Parfait plus its add-ins. Retired specials are skipped by the flyer scout.</p>
+    <div id="specials" class="cards"></div>
+    <form id="special-form" class="row" autocomplete="off">
+      <input name="name" placeholder="New special, e.g. Birthday Cake Parfait" required>
+      <button type="submit">Add special</button>
+    </form>
+
+    <h2>Inventory batches</h2>
+    <table class="edit">
+      <thead><tr><th>Ingredient</th><th>Quantity</th><th>Expires</th><th>Received</th><th></th></tr></thead>
+      <tbody id="batches"></tbody>
+    </table>
+    <form id="batch-form" class="row" autocomplete="off">
+      <select name="ingredient_id" id="batch-ing" required></select>
+      <input name="quantity" type="number" min="0" step="any" placeholder="Quantity" required>
+      <input name="expires_on" type="date" aria-label="Expires on (blank if shelf-stable)">
+      <button type="submit">Add batch</button>
+    </form>
+  </main>
+  <script src="kitchen.js"></script>
+</body>
+</html>

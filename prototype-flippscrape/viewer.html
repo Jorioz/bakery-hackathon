@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flyer Items</title>
+<!-- PROTOTYPE — throwaway viewer for flippscrape CSV output -->
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #fff; --text: #1d1d1b; --muted: #6b6b66;
+    --line: #e3e1dc; --accent: #1f7a4d; --accent-soft: #e4f2ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161716; --card: #202221; --text: #ecebe7; --muted: #9b9a95;
+      --line: #333532; --accent: #5cc48d; --accent-soft: #1e3328;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 16px 0; max-width: 1100px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+  input[type=search], select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+         background: var(--card); color: var(--text); font: inherit; }
+  input[type=search] { flex: 1; min-width: 180px; }
+  .tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+  .tab { padding: 10px 14px; border: 0; background: none; color: var(--muted); font: inherit;
+         cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab .n { font-size: 12px; opacity: .7; margin-left: 4px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+          display: flex; flex-direction: column; gap: 8px; }
+  .price { font-size: 26px; font-weight: 700; color: var(--accent); }
+  .price.none { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .name { font-size: 16px; font-weight: 600; }
+  .sub { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: auto; }
+  .badge { background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 99px; }
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 40px 16px; text-align: center; color: var(--muted); }
+  .drop.over { border-color: var(--accent); }
+  .empty { color: var(--muted); padding: 30px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Flyer Items</h1>
+  <div class="meta" id="meta">Load a flyer_items_*.csv to begin</div>
+  <div class="controls">
+    <input type="file" id="file" accept=".csv">
+    <input type="search" id="q" placeholder="Search items…">
+    <select id="sort">
+      <option value="price">Price: low → high</option>
+      <option value="-price">Price: high → low</option>
+      <option value="name">Name A–Z</option>
+    </select>
+    <label class="meta"><input type="checkbox" id="hideBlank" checked> Hide items without a price</label>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<main>
+  <div id="out"><div class="drop" id="drop">Drop the CSV here, or use the file picker above.</div></div>
+</main>
+<script>
+let rows = [], active = 'All';
+const $ = id => document.getElementById(id);
+
+// Minimal RFC-4180 CSV parser (handles quoted fields with commas/quotes/newlines).
+function parseCSV(text) {
+  const out = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { f += '"'; i++; }
+      else if (c === '"') q = false;
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(f); out.push(row); row = []; f = '';
+    } else f += c;
+  }
+  if (f || row.length) { row.push(f); out.push(row); }
+  const [head, ...body] = out.filter(r => r.length > 1);
+  return body.map(r => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])));
+}
+
+const fmtDate = s => s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function load(text, name) {
+  rows = parseCSV(text).map(r => ({ ...r, p: r.price === '' ? null : parseFloat(r.price) }));
+  active = 'All';
+  $('meta').textContent = `${name} · ${rows.length} items`;
+  render();
+}
+
+function render() {
+  const hide = $('hideBlank').checked;
+  const base = rows.filter(r => !hide || r.p !== null);
+  const counts = base.reduce((m, r) => (m[r.merchant] = (m[r.merchant] || 0) + 1, m), {});
+  const tabs = ['All', ...Object.keys(counts).sort()];
+  $('tabs').innerHTML = tabs.map(t =>
+    `<button class="tab ${t === active ? 'active' : ''}" data-t="${esc(t)}">${esc(t)}<span class="n">${t === 'All' ? base.length : counts[t]}</span></button>`
+  ).join('');
+
+  const q = $('q').value.trim().toLowerCase();
+  const s = $('sort').value;
+  const list = base
+    .filter(r => active === 'All' || r.merchant === active)
+    .filter(r => !q || r.name.toLowerCase().includes(q))
+    .sort((a, b) => s === 'name' ? a.name.localeCompare(b.name)
+      : ((a.p ?? Infinity) - (b.p ?? Infinity)) * (s === '-price' ? -1 : 1));
+
+  $('out').innerHTML = list.length ? `<div class="grid">${list.map(r => `
+    <div class="card">
+      <div class="price ${r.p === null ? 'none' : ''}">${r.p === null ? 'No price listed' : '$' + r.p.toFixed(2)}</div>
+      <div class="name">${esc(r.name)}</div>
+      <div class="sub"><span class="badge">${esc(r.merchant)}</span><span>${fmtDate(r.valid_from)} – ${fmtDate(r.valid_to)}</span></div>
+    </div>`).join('')}</div>` : '<div class="empty">No items match.</div>';
+}
+
+$('tabs').onclick = e => { const b = e.target.closest('.tab'); if (b) { active = b.dataset.t; render(); } };
+['q', 'sort', 'hideBlank'].forEach(id => $(id).addEventListener('input', () => rows.length && render()));
+$('file').onchange = e => { const f = e.target.files[0]; f && f.text().then(t => load(t, f.name)); };
+document.addEventListener('dragover', e => { e.preventDefault(); $('drop')?.classList.add('over'); });
+document.addEventListener('drop', e => {
+  e.preventDefault(); const f = e.dataTransfer.files[0]; f && f.text().then(t => load(t, f.name));
+});
+
+// If served over http (e.g. `python -m http.server`), try ?csv=<file> automatically.
+const auto = new URLSearchParams(location.search).get('csv');
+if (auto && location.protocol.startsWith('http')) fetch(auto).then(r => r.text()).then(t => load(t, auto));
+</script>
+</body>
+</html>
